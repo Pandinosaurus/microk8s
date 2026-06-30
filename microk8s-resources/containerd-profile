@@ -7,6 +7,12 @@ profile cri-containerd.apparmor.d flags=(attach_disconnected,mediate_deleted) {
 
 
   network,
+  network inet,
+  network inet6,
+  network unix,
+  network netlink,
+  network raw,
+
   capability,
   file,
   umount,
@@ -37,4 +43,5 @@ profile cri-containerd.apparmor.d flags=(attach_disconnected,mediate_deleted) {
 
   signal (receive) peer=snap.microk8s.daemon-kubelite,
   signal (receive) peer=snap.microk8s.daemon-containerd,
+  signal (send,receive) peer=cri-containerd.apparmor.d//&unconfined,
 }

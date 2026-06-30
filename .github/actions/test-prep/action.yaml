@@ -4,13 +4,14 @@ runs:
   using: "composite"
   steps:
     - name: Setup Python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
       with:
         python-version: "3.10"
     - name: Install test dependencies
       shell: bash
       run: |
         set -x
+        sudo apt-get remove -y python3-yaml
         sudo pip3 install -r ./tests/requirements.txt
     # Docker sets iptables rules that interfere with LXD and K8s.
     # https://documentation.ubuntu.com/lxd/en/latest/howto/network_bridge_firewalld/#prevent-connectivity-issues-with-lxd-and-docker
@@ -18,7 +19,7 @@ runs:
       shell: bash
       run: sudo iptables -I DOCKER-USER -j ACCEPT
     - name: Fetch snap
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
       with:
         name: microk8s.snap
         path: build

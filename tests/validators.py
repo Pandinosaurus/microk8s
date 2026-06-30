@@ -18,36 +18,6 @@ from utils import (
 TEMPLATES = Path(__file__).absolute().parent / "templates"
 
 
-def validate_dns_dashboard():
-    """
-    Validate the dashboard addon by trying to access the kubernetes dashboard.
-    The dashboard will return an HTML indicating that it is up and running.
-    """
-    ns = "kubernetes-dashboard"
-    components = ["api", "auth", "metrics-scraper", "web"]
-    app_names = [f"kubernetes-dashboard-{app}" for app in components]
-    app_names.append("kong")
-
-    for app_name in app_names:
-        wait_for_pod_state("", ns, "running", label=f"app.kubernetes.io/name={app_name}")
-
-    service = "kubernetes-dashboard-kong-proxy"
-    attempt = 30
-    while attempt > 0:
-        try:
-            output = kubectl(
-                f"get --raw /api/v1/namespaces/{ns}/services/https:{service}:443/proxy/"
-            )
-            if "Kubernetes Dashboard" in output:
-                break
-        except subprocess.CalledProcessError:
-            pass
-        time.sleep(10)
-        attempt -= 1
-
-    assert attempt > 0
-
-
 def validate_storage():
     """
     Validate storage by creating a PVC.
@@ -120,12 +90,12 @@ def validate_ingress():
     """
     Validate ingress by creating a ingress rule.
     """
-    daemonset = kubectl("get ds")
-    if "nginx-ingress-microk8s-controller" in daemonset:
-        wait_for_pod_state("", "default", "running", label="app=default-http-backend")
-        wait_for_pod_state("", "default", "running", label="name=nginx-ingress-microk8s")
-    else:
+    ds = kubectl("get ds -n ingress")
+    if "nginx-ingress-microk8s-controller" in ds:
         wait_for_pod_state("", "ingress", "running", label="name=nginx-ingress-microk8s")
+    else:
+        # Support migration to Traefik ingress controller
+        wait_for_pod_state("", "ingress", "running", label="app.kubernetes.io/name=traefik")
 
     manifest = TEMPLATES / "ingress.yaml"
     update_yaml_with_arch(manifest)

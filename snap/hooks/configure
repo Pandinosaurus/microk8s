@@ -407,9 +407,10 @@ then
   need_api_restart=true
 fi
 
-if ! grep '\-\-enable\-v2' ${SNAP_DATA}/args/etcd
+# etcd --enable-v2 flag is removed after 3.6
+if grep -e "--enable-v2=" ${SNAP_DATA}/args/etcd
 then
-  refresh_opt_in_config enable-v2 true etcd
+  "${SNAP}/bin/sed" -i '/--enable-v2=/d' "$SNAP_DATA/args/etcd"
   snapctl restart ${SNAP_NAME}.daemon-etcd
 fi
 
@@ -524,6 +525,24 @@ then
   $SNAP/bin/sed -i '/\-\-storage\-dir/d' ${SNAP_DATA}/args/kube-apiserver
 
   snapctl restart ${SNAP_NAME}.daemon-k8s-dqlite
+fi
+
+# Disable the features misbehaving with dqlite
+if grep -e '^\-\-etcd\-servers=.*kine.sock:12379' ${SNAP_DATA}/args/kube-apiserver
+then
+  if grep -e '^\-\-feature\-gates' ${SNAP_DATA}/args/kube-apiserver
+  then
+    for feature in ListFromCacheSnapshot SizeBasedListCostEstimate DetectCacheInconsistency
+    do
+      if ! grep -e "$feature" "$SNAP_DATA/args/kube-apiserver"
+      then
+        "${SNAP}/bin/sed" -i '/^--feature-gates=/ s/$/,'$feature'=false/' "$SNAP_DATA/args/kube-apiserver"
+      fi
+    done
+  else
+    echo '--feature-gates=ListFromCacheSnapshot=false,SizeBasedListCostEstimate=false,DetectCacheInconsistency=false' >> ${SNAP_DATA}/args/kube-apiserver
+  fi
+  need_api_restart=true
 fi
 
 # Fix hard-coded snap revision numbers in worker node services of existing clusters

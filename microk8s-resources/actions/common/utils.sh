@@ -88,6 +88,10 @@ remove_vxlan_interfaces() {
   done
 }
 
+list_env_vars() {
+  env | awk -F= '{print $1}' | paste -sd,
+}
+
 run_with_sudo() {
   if [ "$1" == "preserve_env" ]; then
     shift
@@ -96,7 +100,7 @@ run_with_sudo() {
     "$@"
   else
     local SAVE_LD_LIBRARY_PATH="${LD_LIBRARY_PATH}"
-    LD_LIBRARY_PATH="" sudo -E PATH="${PATH}" LD_LIBRARY_PATH="${SAVE_LD_LIBRARY_PATH}" PYTHONPATH="${PYTHONPATH:-}" "$@"
+    LD_LIBRARY_PATH="" sudo --preserve-env="$(list_env_vars)" PATH="${PATH}" LD_LIBRARY_PATH="${SAVE_LD_LIBRARY_PATH}" PYTHONPATH="${PYTHONPATH:-}" "$@"
   fi
 }
 
@@ -686,12 +690,26 @@ produce_certs() {
 
     # Generate apiserver CA
     if ! [ -f ${SNAP_DATA}/certs/ca.crt ]; then
-        "${SNAP}/openssl.wrapper" req -x509 -new -sha256 -nodes -days 3650 -key ${SNAP_DATA}/certs/ca.key -subj "/CN=10.152.183.1" -out ${SNAP_DATA}/certs/ca.crt
+        "${SNAP}/openssl.wrapper" req -x509 -new -sha256 -nodes -days 3650 \
+            -key ${SNAP_DATA}/certs/ca.key \
+            -subj "/CN=10.152.183.1" \
+            -addext "basicConstraints=critical,CA:TRUE" \
+            -addext "keyUsage=critical,keyCertSign,cRLSign" \
+            -addext "subjectKeyIdentifier=hash" \
+            -addext "authorityKeyIdentifier=keyid:always,issuer" \
+            -out ${SNAP_DATA}/certs/ca.crt
     fi
 
     # Generate front proxy CA
     if ! [ -f ${SNAP_DATA}/certs/front-proxy-ca.crt ]; then
-        "${SNAP}/openssl.wrapper" req -x509 -new -sha256 -nodes -days 3650 -key ${SNAP_DATA}/certs/front-proxy-ca.key -subj "/CN=front-proxy-ca" -out ${SNAP_DATA}/certs/front-proxy-ca.crt
+        "${SNAP}/openssl.wrapper" req -x509 -new -sha256 -nodes -days 3650 \
+            -key ${SNAP_DATA}/certs/front-proxy-ca.key \
+            -subj "/CN=front-proxy-ca" \
+            -addext "basicConstraints=critical,CA:TRUE" \
+            -addext "keyUsage=critical,keyCertSign,cRLSign" \
+            -addext "subjectKeyIdentifier=hash" \
+            -addext "authorityKeyIdentifier=keyid:always,issuer" \
+            -out ${SNAP_DATA}/certs/front-proxy-ca.crt
     fi
 
     # Produce certificates based on the rendered csr.conf.rendered.
@@ -1194,7 +1212,7 @@ fetch_as() {
     ARCH="$($SNAP/bin/uname -m)"
     LD_LIBRARY_PATH="$SNAP/lib:$SNAP/usr/lib:$SNAP/lib/$ARCH-linux-gnu:$SNAP/usr/lib/$ARCH-linux-gnu" "${SNAP}/usr/bin/curl" -L $1 -o $2
   else
-    CA_CERT=/snap/core20/current/etc/ssl/certs/ca-certificates.crt
+    CA_CERT=/snap/core22/current/etc/ssl/certs/ca-certificates.crt
     run_with_sudo "${SNAP}/usr/bin/curl" --cacert $CA_CERT -L $1 -o $2
   fi
 }
@@ -1371,7 +1389,7 @@ use_snap_env() {
   # Configure PATH, LD_LIBRARY_PATH and PYTHONPATH
   export PATH="$SNAP/usr/bin:$SNAP/bin:$SNAP/usr/sbin:$SNAP/sbin:$REAL_PATH"
   export LD_LIBRARY_PATH="$SNAP_LIBRARY_PATH:$SNAP/lib:$SNAP/usr/lib:$SNAP/lib/$SNAPCRAFT_ARCH_TRIPLET:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET:$SNAP/usr/lib/$SNAPCRAFT_ARCH_TRIPLET/ceph:${REAL_LD_LIBRARY_PATH:-}"
-  export PYTHONPATH="$SNAP/usr/lib/python3.8:$SNAP/lib/python3.8/site-packages:$SNAP/usr/lib/python3/dist-packages"
+  export PYTHONPATH="$SNAP/usr/lib/python3.10:$SNAP/lib/python3.10/site-packages:$SNAP/usr/lib/python3/dist-packages"
 
   # Python configuration
   export PYTHONNOUSERSITE=false
